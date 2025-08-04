@@ -27,14 +27,33 @@ public class PlayerController : MonoBehaviour
     private int currentHealth;
     public PlayerHealthUI healthUI; // ← drag HealthHUD here in Inspector
 
+    [Header("Flutter Settings")]
+    public float flutterDuration = 3f;         // Max flutter time per jump
+    public float flutterGravity = -2f;         // Gentle fall speed while fluttering
+
+    private float flutterTimer = 0f;
+    private bool isFluttering = false;
+    
+    
     private CharacterController controller;
     private Transform cam;
 
     private Vector2 moveInput;
-    private bool jumpPressed;
 
     private Vector3 velocity;
 
+    
+    
+    public void Bounce(float force)
+    {
+        velocity.y = force;
+
+        if (audioJump != null)
+            audioJump.Play(); // Optional: also play jump sound if you want
+    }
+
+    
+    
     void Awake()
     {
         controller = GetComponent<CharacterController>();
@@ -89,35 +108,61 @@ public class PlayerController : MonoBehaviour
     {
         moveInput = value.Get<Vector2>();
     }
-
-    public void OnJump(InputValue value)
-    {
-        jumpPressed = value.isPressed;
-    }
+    
 
     void ApplyGravityAndJump()
     {
         if (controller.isGrounded)
         {
+            // Reset vertical velocity & flutter state
             if (velocity.y < 0f)
                 velocity.y = -2f;
 
-            if (jumpPressed)
+            flutterTimer = flutterDuration;
+            isFluttering = false;
+
+            // Only jump if jump is held *this frame* while grounded
+            if (Keyboard.current.spaceKey.wasPressedThisFrame)
             {
                 velocity.y = jumpForce;
-                jumpPressed = false;
                 Debug.Log("Jump triggered! velocity.y = " + velocity.y);
 
                 if (audioJump != null)
                     audioJump.Play();
             }
         }
-
         else
         {
-            velocity.y += gravity * Time.deltaTime;
+            bool holdingJump = Keyboard.current.spaceKey.isPressed;
+
+            if (holdingJump && flutterTimer > 0f && velocity.y <= 0f)
+            {
+                // Start or continue fluttering while falling
+                if (!isFluttering)
+                {
+                    isFluttering = true;
+                    Debug.Log("Started Fluttering");
+                }
+
+                flutterTimer -= Time.deltaTime;
+                velocity.y = flutterGravity;
+            }
+            else
+            {
+                if (isFluttering)
+                {
+                    isFluttering = false;
+                    Debug.Log("Stopped Fluttering");
+                }
+
+                // Normal gravity
+                velocity.y += gravity * Time.deltaTime;
+            }
         }
+
     }
+
+
 
     void HandleMovement()
     {
